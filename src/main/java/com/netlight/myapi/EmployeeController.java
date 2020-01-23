@@ -1,44 +1,47 @@
 package com.netlight.myapi;
 
 
+import com.sun.jndi.toolkit.url.Uri;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
-
 @RestController
 public class EmployeeController {
-    private final EmployeeRepository repository;
 
-    EmployeeController(EmployeeRepository repository) {
+    private final EmployeeRepository repository;
+    private final EmployeeResourceAssembler employeeResourceAssembler;
+
+    EmployeeController(EmployeeRepository repository, EmployeeResourceAssembler assembler) {
         this.repository = repository;
+        this.employeeResourceAssembler = assembler;
     }
 
     @GetMapping("/employees")
     CollectionModel all() {
 
-        List<Employee> allEmployees = repository.findAll();
+        List<EntityModel<Employee>> all = repository.findAll().stream().
+                map(employeeResourceAssembler::toModel).collect(Collectors.toList());
 
-        CollectionModel collectedEmployees =  new CollectionModel(allEmployees.stream().map(employee -> {
-            EntityModel<Employee> emp = new EntityModel<>(employee);
-            emp.add(linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel());
-            emp.add(linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
-            return emp;
-        }).collect(Collectors.toList()));
-
-        collectedEmployees.add(linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
-        return collectedEmployees;
+        return new CollectionModel(all,
+                linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
     }
 
     @PostMapping("/employees")
-    Employee newEmployee(@RequestBody Employee newEmployee) {
-        return repository.save(newEmployee);
+    ResponseEntity<?> newEmployee(@RequestBody Employee newEmployee) throws URISyntaxException {
+
+        EntityModel<Employee> entityModel = employeeResourceAssembler.toModel(repository.save(newEmployee));
+
+        return ResponseEntity.created(new URI("")).body(entityModel);
     }
 
     @GetMapping("/employees/{id}")
@@ -46,11 +49,8 @@ public class EmployeeController {
 
         Employee employee = repository.findById(id)
                 .orElseThrow(() -> new EmployeeNotFoundException(id));
-        EntityModel<Employee> model = new EntityModel<>(employee);
-        model.add(linkTo(methodOn(EmployeeController.class).one(id)).withSelfRel());
-        model.add(linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
 
-        return model;
+        return employeeResourceAssembler.toModel(employee);
     }
 
     @PutMapping("/employees/{id}")
