@@ -1,7 +1,5 @@
 package com.netlight.myapi;
 
-
-import com.sun.jndi.toolkit.url.Uri;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.http.ResponseEntity;
